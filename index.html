@@ -14,45 +14,33 @@
 <body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-4 font-sans text-center">
 
     <div class="w-full max-w-md space-y-6">
-        <header class="py-4">
-            <h1 class="text-3xl font-black tracking-tighter text-blue-500 italic">4WINNERS</h1>
-            <p class="text-slate-400 text-[10px] uppercase tracking-[0.3em] font-bold">Product Studio</p>
+        <header class="py-6">
+            <h1 class="text-4xl font-black tracking-tighter text-blue-500 italic">4WINNERS</h1>
+            <p class="text-slate-400 text-[10px] uppercase tracking-[0.4em] font-bold">Product Studio</p>
         </header>
 
-        <div class="relative bg-slate-800 rounded-[2.5rem] p-3 shadow-2xl border border-slate-700 overflow-hidden aspect-[3/4]">
-            <video id="video" autoplay playsinline class="rounded-[2rem]"></video>
+        <div class="relative bg-slate-800 rounded-[3rem] p-2 shadow-2xl border border-slate-700 overflow-hidden aspect-[3/4]">
+            <video id="video" autoplay playsinline class="rounded-[2.5rem]"></video>
             <canvas id="canvas" class="hidden"></canvas>
-            
-            <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div class="w-72 h-72 border border-white/10 rounded-full"></div>
-                <div class="absolute inset-x-10 h-[1px] bg-white/5"></div>
-                <div class="absolute inset-y-20 w-[1px] bg-white/5"></div>
-            </div>
+            <input type="hidden" id="api-url">
         </div>
 
-        <div class="bg-slate-800/50 p-6 rounded-[2rem] backdrop-blur-md border border-slate-700 space-y-4">
-            <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1 text-left">Sincronização Ativa</label>
-                <input type="text" id="api-url" readonly 
-                       class="w-full bg-slate-900/50 border border-slate-700 p-3 rounded-xl text-xs text-blue-400/70 focus:outline-none italic"
-                       placeholder="Sincronizando com o Colab...">
-            </div>
-
+        <div class="px-4">
             <button id="btn-main" onclick="takePhoto()" 
-                    class="w-full bg-blue-600 hover:bg-blue-500 py-6 rounded-2xl font-black text-lg shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
-                <span>GERAR COM IA</span>
+                    class="w-full bg-blue-600 hover:bg-blue-500 py-6 rounded-3xl font-black text-xl shadow-lg active:scale-95 transition-all flex justify-center items-center">
+                <span>GERAR CATÁLOGO</span>
             </button>
         </div>
 
-        <div id="status" class="hidden flex flex-col items-center py-6">
+        <div id="status" class="hidden flex flex-col items-center py-4">
             <div class="loader ease-linear rounded-full border-4 border-t-4 border-slate-700 h-10 w-10 mb-3"></div>
-            <p class="text-blue-400 font-bold text-xs uppercase tracking-widest">Criando Catálogo 4WINNERS...</p>
+            <p class="text-blue-400 font-bold text-xs uppercase tracking-widest">IA a processar miniaturas...</p>
         </div>
 
         <div id="result" class="hidden space-y-4 pb-12">
-            <img id="res-img" class="w-full rounded-[2rem] border-4 border-slate-700 shadow-2xl">
+            <img id="res-img" class="w-full rounded-[2.5rem] border-4 border-slate-700 shadow-2xl">
             <a id="dl-btn" class="block w-full bg-white text-slate-900 text-center py-5 rounded-2xl font-black text-sm tracking-tighter uppercase shadow-xl active:scale-95 transition-all">
-                Download da Imagem
+                Download PNG Final
             </a>
         </div>
     </div>
@@ -68,23 +56,21 @@
                 if (response.ok) {
                     const urlRaw = await response.text();
                     document.getElementById('api-url').value = urlRaw.trim();
+                    console.log("Sync OK");
                 }
-            } catch (e) { console.error("Erro na sync."); }
+            } catch (e) { console.error("Erro Sync"); }
         }
 
         async function initCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, 
-                    audio: false 
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
-            } catch (err) { alert("Aceda por HTTPS para ligar a câmara."); }
+            } catch (err) { alert("Erro de câmara."); }
         }
 
         async function takePhoto() {
             const apiUrl = document.getElementById('api-url').value.trim();
-            if(!apiUrl) return alert("Aguarde a sincronização do link.");
+            if(!apiUrl) return alert("Aguarde a conexão com o Colab...");
 
             const btn = document.getElementById('btn-main');
             const status = document.getElementById('status');
@@ -109,13 +95,12 @@
                     
                     document.getElementById('res-img').src = imgUrl;
                     document.getElementById('dl-btn').href = imgUrl;
-                    document.getElementById('dl-btn').download = `4winners_${Date.now()}.png`;
+                    document.getElementById('dl-btn').download = `4winners_catalog.png`;
                     
                     resultDiv.classList.remove('hidden');
                     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                } catch (e) {
-                    alert("Erro de conexão com o servidor Colab.");
-                } finally {
+                } catch (e) { alert("Servidor Colab Offline."); }
+                finally {
                     btn.disabled = false;
                     status.classList.add('hidden');
                 }
