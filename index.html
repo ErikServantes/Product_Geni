@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estúdio IA Instantâneo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #video { transform: scaleX(1); width: 100%; border-radius: 1rem; }
+        .loader { border-top-color: #3498db; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4 font-sans">
+
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-6 space-y-4">
+        <h1 class="text-2xl font-bold text-center text-gray-800">Estúdio Nano Banana</h1>
+        
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 uppercase">URL do Servidor (Colab)</label>
+            <input type="text" id="api-url" placeholder="https://xxxx-xxx.ngrok-free.app" 
+                   class="w-full p-2 border rounded-lg text-sm mb-2 focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="relative overflow-hidden bg-black rounded-xl aspect-[3/4]">
+            <video id="video" autoplay playsinline class="h-full object-cover"></video>
+            <canvas id="canvas" class="hidden"></canvas>
+        </div>
+
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 uppercase">Tamanhos (separados por espaço)</label>
+            <input type="text" id="sizes" value="12 15 18 25" 
+                   class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <button id="btn-capture" onclick="processarImagem()" 
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg active:scale-95">
+            FOTOGRAFAR E GERAR
+        </button>
+
+        <div id="loading" class="hidden flex flex-col items-center py-4">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-2"></div>
+            <p class="text-sm text-blue-600 font-medium animate-pulse">O Gemini está a redesenhar o produto...</p>
+        </div>
+
+        <div id="result-container" class="hidden space-y-2">
+            <p class="text-center font-bold text-green-600">✅ Gerado com Sucesso!</p>
+            <img id="result-img" class="w-full rounded-lg shadow-md border border-gray-200">
+            <a id="download-link" class="block w-full text-center bg-gray-800 text-white py-3 rounded-lg font-semibold">Descarregar PNG</a>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const loading = document.getElementById('loading');
+        const resultContainer = document.getElementById('result-container');
+
+        // Iniciar câmara traseira
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("Erro ao aceder à câmara: " + err);
+            }
+        }
+
+        async function processarImagem() {
+            const apiUrl = document.getElementById('api-url').value;
+            if (!apiUrl) return alert("Por favor, cola o URL do Ngrok que aparece no teu Colab.");
+
+            // Mostrar loading
+            loading.classList.remove('hidden');
+            resultContainer.classList.add('hidden');
+
+            // Capturar frame do vídeo
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            // Converter para Blob
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('image', blob, 'foto.jpg');
+                formData.append('sizes', document.getElementById('sizes').value);
+
+                try {
+                    const response = await fetch(`${apiUrl}/process`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) throw new Error("Erro no servidor");
+
+                    const resultBlob = await response.blob();
+                    const imageUrl = URL.createObjectURL(resultBlob);
+                    
+                    // Mostrar resultado
+                    document.getElementById('result-img').src = imageUrl;
+                    document.getElementById('download-link').href = imageUrl;
+                    document.getElementById('download-link').download = "catalogo_ia.png";
+                    
+                    resultContainer.classList.remove('hidden');
+                } catch (err) {
+                    alert("Erro ao processar: " + err.message);
+                } finally {
+                    loading.classList.add('hidden');
+                }
+            }, 'image/jpeg', 0.9);
+        }
+
+        setupCamera();
+    </script>
+</body>
+</html>
