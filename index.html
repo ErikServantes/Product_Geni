@@ -5,109 +5,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>4WINNERS Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .loader { border-top-color: #3b82f6; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #video { object-fit: cover; width: 100%; height: 100%; background: #000; }
-    </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-4 font-sans text-center">
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-4 text-center font-sans">
 
     <div class="w-full max-w-md space-y-6">
-        <header class="py-6">
-            <h1 class="text-4xl font-black tracking-tighter text-blue-500 italic">4WINNERS</h1>
+        <header class="py-8">
+            <h1 class="text-4xl font-black italic text-blue-500">4WINNERS</h1>
             <p class="text-slate-400 text-[10px] uppercase tracking-[0.4em] font-bold">Product Studio</p>
         </header>
 
-        <div class="relative bg-slate-800 rounded-[3rem] p-2 shadow-2xl border border-slate-700 overflow-hidden aspect-[3/4]">
-            <video id="video" autoplay playsinline class="rounded-[2.5rem]"></video>
-            <canvas id="canvas" class="hidden"></canvas>
+        <div class="relative bg-slate-800 rounded-[3rem] p-2 shadow-2xl border border-slate-700 aspect-[3/4] overflow-hidden">
+            <video id="video" autoplay playsinline class="rounded-[2.5rem] w-full h-full object-cover bg-black"></video>
             <input type="hidden" id="api-url">
         </div>
 
-        <div class="px-4">
-            <button id="btn-main" onclick="takePhoto()" 
-                    class="w-full bg-blue-600 hover:bg-blue-500 py-6 rounded-3xl font-black text-xl shadow-lg active:scale-95 transition-all flex justify-center items-center">
-                <span>GERAR CATÁLOGO</span>
-            </button>
+        <button id="btn-main" onclick="takePhoto()" 
+                class="w-full bg-blue-600 py-6 rounded-3xl font-black text-xl shadow-lg active:scale-95 transition-all">
+            GERAR COM IA
+        </button>
+
+        <div id="status" class="hidden py-4">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-2"></div>
+            <p class="text-blue-400 text-xs font-bold uppercase">Processando Miniaturas...</p>
         </div>
 
-        <div id="status" class="hidden flex flex-col items-center py-4">
-            <div class="loader ease-linear rounded-full border-4 border-t-4 border-slate-700 h-10 w-10 mb-3"></div>
-            <p class="text-blue-400 font-bold text-xs uppercase tracking-widest">IA a processar miniaturas...</p>
-        </div>
-
-        <div id="result" class="hidden space-y-4 pb-12">
-            <img id="res-img" class="w-full rounded-[2.5rem] border-4 border-slate-700 shadow-2xl">
-            <a id="dl-btn" class="block w-full bg-white text-slate-900 text-center py-5 rounded-2xl font-black text-sm tracking-tighter uppercase shadow-xl active:scale-95 transition-all">
-                Download PNG Final
-            </a>
+        <div id="result" class="hidden space-y-4 pb-20">
+            <img id="res-img" class="w-full rounded-[2.5rem] border-4 border-slate-700 shadow-2xl bg-white">
+            <a id="dl-btn" class="block w-full bg-white text-slate-900 py-5 rounded-2xl font-black uppercase text-sm">Download PNG</a>
         </div>
     </div>
 
     <script>
         const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
         const REPO_PATH = "erikservantes/Product_Geni";
 
-        async function carregarUrlAutomatica() {
+        async function syncUrl() {
             try {
-                const response = await fetch(`https://raw.githubusercontent.com/${REPO_PATH}/main/url_servidor.txt?t=${Date.now()}`);
-                if (response.ok) {
-                    const urlRaw = await response.text();
-                    document.getElementById('api-url').value = urlRaw.trim();
-                    console.log("Sync OK");
-                }
-            } catch (e) { console.error("Erro Sync"); }
+                const res = await fetch(`https://raw.githubusercontent.com/${REPO_PATH}/main/url_servidor.txt?t=${Date.now()}`);
+                if (res.ok) document.getElementById('api-url').value = (await res.text()).trim();
+            } catch (e) { console.error("Sync fail"); }
         }
 
-        async function initCamera() {
+        async function init() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                video.srcObject = stream;
-            } catch (err) { alert("Erro de câmara."); }
+                video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            } catch (e) { alert("Erro cam"); }
         }
 
         async function takePhoto() {
-            const apiUrl = document.getElementById('api-url').value.trim();
-            if(!apiUrl) return alert("Aguarde a conexão com o Colab...");
+            const url = document.getElementById('api-url').value;
+            if(!url) return alert("Sincronizando... Tente em 3 segundos.");
 
             const btn = document.getElementById('btn-main');
             const status = document.getElementById('status');
             const resultDiv = document.getElementById('result');
 
-            btn.disabled = true;
-            status.classList.remove('hidden');
-            resultDiv.classList.add('hidden');
+            btn.disabled = true; status.classList.remove('hidden'); resultDiv.classList.add('hidden');
 
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
             
             canvas.toBlob(async (blob) => {
-                const fd = new FormData();
-                fd.append('image', blob, 'capture.jpg');
-
+                const fd = new FormData(); fd.append('image', blob, 'img.jpg');
                 try {
-                    const response = await fetch(`${apiUrl}/process`, { method: 'POST', body: fd });
-                    const resBlob = await response.blob();
-                    const imgUrl = URL.createObjectURL(resBlob);
+                    const response = await fetch(`${url}/process`, { method: 'POST', body: fd });
+                    if(!response.ok) throw new Error();
                     
-                    document.getElementById('res-img').src = imgUrl;
-                    document.getElementById('dl-btn').href = imgUrl;
-                    document.getElementById('dl-btn').download = `4winners_catalog.png`;
-                    
-                    resultDiv.classList.remove('hidden');
-                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                } catch (e) { alert("Servidor Colab Offline."); }
-                finally {
-                    btn.disabled = false;
-                    status.classList.add('hidden');
-                }
+                    const imgBlob = await response.blob();
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64data = reader.result;
+                        document.getElementById('res-img').src = base64data;
+                        document.getElementById('dl-btn').href = base64data;
+                        document.getElementById('dl-btn').download = "4winners_catalog.png";
+                        resultDiv.classList.remove('hidden');
+                        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                    };
+                    reader.readAsDataURL(imgBlob);
+                } catch (e) { alert("Erro no servidor Colab."); }
+                finally { btn.disabled = false; status.classList.add('hidden'); }
             }, 'image/jpeg', 0.9);
         }
 
-        window.onload = () => { initCamera(); carregarUrlAutomatica(); };
+        window.onload = () => { init(); syncUrl(); };
     </script>
 </body>
 </html>
