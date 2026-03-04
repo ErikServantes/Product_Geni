@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>4WINNERS Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loader-overlay {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white h-[100dvh] overflow-hidden flex flex-col items-center justify-between p-4 font-sans">
+
+    <div class="w-full max-w-md h-full flex flex-col justify-between">
+        
+        <header class="py-4 shrink-0 text-center">
+            <h1 class="text-4xl font-black italic text-blue-500">4WINNERS</h1>
+            <p class="text-slate-400 text-[10px] uppercase tracking-[0.4em] font-bold">Product Studio</p>
+        </header>
+
+        <div class="flex-1 w-full min-h-0 relative pb-2">
+            <div class="w-full h-full bg-slate-800 rounded-[2.5rem] p-2 shadow-2xl border border-slate-700 relative overflow-hidden">
+                
+                <video id="video" autoplay playsinline class="w-full h-full rounded-[2rem] object-cover bg-black"></video>
+                
+                <img id="thumbnail" class="absolute inset-2 w-[calc(100%-1rem)] h-[calc(100%-1rem)] rounded-[2rem] object-cover bg-black opacity-0 pointer-events-none transition-opacity duration-300 z-10">
+                
+                <div id="loader" class="absolute inset-2 rounded-[2rem] loader-overlay flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 z-20">
+                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+                    <p class="text-blue-400 text-xs font-black uppercase tracking-widest">A Processar...</p>
+                </div>
+
+                <input type="hidden" id="api-url">
+            </div>
+        </div>
+
+        <div id="settings-panel" class="shrink-0 bg-slate-800/50 p-3 rounded-3xl border border-slate-700 mb-4 transition-opacity duration-300">
+            <label class="block text-center text-[10px] text-blue-400 font-black uppercase tracking-widest mb-1">Medidas Miniaturas</label>
+            <input type="text" id="sizes-input" value="12 15 18 25" 
+                   class="w-full bg-slate-900 border-2 border-slate-700 py-3 rounded-2xl text-center font-mono text-xl text-white focus:outline-none focus:border-blue-500 transition-all">
+        </div>
+
+        <div class="shrink-0 w-full h-16 relative mb-2">
+            
+            <button id="btn-main" onclick="takePhoto()" 
+                    class="absolute inset-0 w-full h-full bg-blue-600 hover:bg-blue-500 rounded-3xl font-black text-xl shadow-lg transition-all duration-300 z-30 opacity-100 pointer-events-auto active:scale-95">
+                GERAR COM IA
+            </button>
+
+            <div id="btn-results" class="absolute inset-0 w-full h-full flex gap-3 transition-all duration-300 z-20 opacity-0 pointer-events-none">
+                <button onclick="resetCamera()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-3xl font-black uppercase text-sm shadow-lg active:scale-95 transition-all">
+                    Descartar
+                </button>
+                <a id="dl-btn" onclick="showNewPhotoState()" class="flex-1 bg-white text-slate-900 rounded-3xl font-black uppercase text-sm shadow-lg flex items-center justify-center cursor-pointer active:scale-95 transition-all">
+                    Guardar
+                </a>
+            </div>
+
+            <button id="btn-new" onclick="resetCamera()" 
+                    class="absolute inset-0 w-full h-full bg-emerald-500 hover:bg-emerald-400 text-white rounded-3xl font-black text-xl shadow-lg transition-all duration-300 z-10 opacity-0 pointer-events-none active:scale-95">
+                NOVA FOTO
+            </button>
+            
+        </div>
+
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const thumbnail = document.getElementById('thumbnail');
+        const loader = document.getElementById('loader');
+        const settingsPanel = document.getElementById('settings-panel');
+        
+        // Botões
+        const btnMain = document.getElementById('btn-main');
+        const btnResults = document.getElementById('btn-results');
+        const btnNew = document.getElementById('btn-new');
+        
+        const REPO_PATH = "erikservantes/Product_Geni";
+        let stream = null;
+
+        // Gestor de UI (Muda os botões sem mexer no layout)
+        function setUIState(state) {
+            // Reseta tudo para transparente/inativo
+            btnMain.classList.replace('opacity-100', 'opacity-0');
+            btnMain.classList.replace('pointer-events-auto', 'pointer-events-none');
+            
+            btnResults.classList.replace('opacity-100', 'opacity-0');
+            btnResults.classList.replace('pointer-events-auto', 'pointer-events-none');
+            
+            btnNew.classList.replace('opacity-100', 'opacity-0');
+            btnNew.classList.replace('pointer-events-auto', 'pointer-events-none');
+
+            settingsPanel.classList.remove('opacity-30', 'pointer-events-none');
+            btnMain.innerText = "GERAR COM IA";
+
+            if (state === 'ready') {
+                btnMain.classList.replace('opacity-0', 'opacity-100');
+                btnMain.classList.replace('pointer-events-none', 'pointer-events-auto');
+            } 
+            else if (state === 'processing') {
+                btnMain.classList.replace('opacity-0', 'opacity-100');
+                btnMain.innerText = "A PROCESSAR...";
+                settingsPanel.classList.add('opacity-30', 'pointer-events-none');
+            }
+            else if (state === 'done') {
+                btnResults.classList.replace('opacity-0', 'opacity-100');
+                btnResults.classList.replace('pointer-events-none', 'pointer-events-auto');
+                settingsPanel.classList.add('opacity-30', 'pointer-events-none');
+            }
+            else if (state === 'new_photo') {
+                btnNew.classList.replace('opacity-0', 'opacity-100');
+                btnNew.classList.replace('pointer-events-none', 'pointer-events-auto');
+            }
+        }
+
+        async function syncUrl() {
+            try {
+                const res = await fetch(`https://raw.githubusercontent.com/${REPO_PATH}/main/url_servidor.txt?t=${Date.now()}`);
+                if (res.ok) document.getElementById('api-url').value = (await res.text()).trim();
+            } catch (e) { console.error("Falha ao sincronizar URL"); }
+        }
+
+        async function init() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
+                });
+                video.srcObject = stream;
+            } catch (e) { alert("Erro ao aceder à câmara."); }
+        }
+
+        function stopCamera() {
+            if (stream) stream.getTracks().forEach(track => track.stop());
+        }
+
+        // Chamado quando a imagem é Guardada/Descarregada
+        function showNewPhotoState() {
+            setUIState('new_photo');
+        }
+
+        // Chamado ao clicar "Descartar" ou "Nova Foto"
+        async function resetCamera() {
+            thumbnail.classList.replace('opacity-100', 'opacity-0');
+            thumbnail.classList.add('pointer-events-none');
+            
+            setUIState('ready');
+            await init();
+        }
+
+        async function takePhoto() {
+            const url = document.getElementById('api-url').value;
+            const sizes = document.getElementById('sizes-input').value;
+            
+            if(!url) return alert("Sincronizando URL... Tente em instantes.");
+
+            // Congela o UI para processing
+            setUIState('processing');
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            // Mostra o Thumbnail atual e o loading
+            thumbnail.src = canvas.toDataURL('image/jpeg', 0.9);
+            thumbnail.classList.replace('opacity-0', 'opacity-100');
+            thumbnail.classList.remove('pointer-events-none');
+            
+            loader.classList.replace('opacity-0', 'opacity-100');
+            
+            stopCamera(); // Poupar bateria
+
+            // Envio
+            canvas.toBlob(async (blob) => {
+                const fd = new FormData(); 
+                fd.append('image', blob, 'img.jpg');
+                fd.append('sizes', sizes);
+
+                try {
+                    const response = await fetch(`${url}/process`, { method: 'POST', body: fd });
+                    if(!response.ok) throw new Error("Erro no servidor");
+                    
+                    const imgBlob = await response.blob();
+                    const resultUrl = URL.createObjectURL(imgBlob);
+
+                    // Imagem pronta
+                    thumbnail.src = resultUrl;
+                    document.getElementById('dl-btn').href = resultUrl;
+                    document.getElementById('dl-btn').download = `4winners_studio_${Date.now()}.png`;
+                    
+                    loader.classList.replace('opacity-100', 'opacity-0');
+                    setUIState('done');
+                    
+                } catch (e) { 
+                    alert("Erro ao processar imagem.");
+                    loader.classList.replace('opacity-100', 'opacity-0');
+                    resetCamera();
+                }
+            }, 'image/jpeg', 0.9);
+        }
+
+        window.onload = () => { init(); syncUrl(); };
+    </script>
+</body>
+</html>
