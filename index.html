@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>4WINNERS Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Overlay de loading sobre o thumbnail */
+        .loader-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-4 text-center font-sans">
+
+    <div class="w-full max-w-md space-y-6">
+        <header class="py-6">
+            <h1 class="text-4xl font-black italic text-blue-500">4WINNERS</h1>
+            <p class="text-slate-400 text-[10px] uppercase tracking-[0.4em] font-bold">Product Studio</p>
+        </header>
+
+        <div class="relative bg-slate-800 rounded-[3rem] p-2 shadow-2xl border border-slate-700 aspect-[3/4] overflow-hidden" id="camera-container">
+            <video id="video" autoplay playsinline class="rounded-[2.5rem] w-full h-full object-cover bg-black"></video>
+            <img id="thumbnail" class="hidden rounded-[2.5rem] w-full h-full object-cover bg-black">
+            
+            <div id="loader" class="hidden loader-overlay rounded-[2.5rem]">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+                <p class="text-blue-400 text-xs font-black uppercase tracking-widest">IA a Processar...</p>
+            </div>
+            
+            <input type="hidden" id="api-url">
+        </div>
+
+        <div class="space-y-2">
+            <label class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Medidas das Miniaturas</label>
+            <input type="text" id="sizes-input" value="12 15 18 25" 
+                   class="w-full bg-slate-800 border border-slate-700 py-3 rounded-2xl text-center font-bold text-blue-400 focus:outline-none focus:border-blue-500">
+        </div>
+
+        <button id="btn-main" onclick="takePhoto()" 
+                class="w-full bg-blue-600 py-6 rounded-3xl font-black text-xl shadow-lg active:scale-95 transition-all">
+            GERAR COM IA
+        </button>
+
+        <div id="result-actions" class="hidden pb-10">
+            <a id="dl-btn" class="block w-full bg-white text-slate-900 py-5 rounded-2xl font-black uppercase text-sm shadow-xl">Download PNG</a>
+            <button onclick="resetCamera()" class="mt-4 text-slate-500 text-xs font-bold uppercase underline">Tirar nova foto</button>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const thumbnail = document.getElementById('thumbnail');
+        const loader = document.getElementById('loader');
+        const btnMain = document.getElementById('btn-main');
+        const resultActions = document.getElementById('result-actions');
+        const REPO_PATH = "erikservantes/Product_Geni";
+        let stream = null;
+
+        async function syncUrl() {
+            try {
+                const res = await fetch(`https://raw.githubusercontent.com/${REPO_PATH}/main/url_servidor.txt?t=${Date.now()}`);
+                if (res.ok) document.getElementById('api-url').value = (await res.text()).trim();
+            } catch (e) { console.error("Sync fail"); }
+        }
+
+        async function init() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+            } catch (e) { alert("Erro ao aceder à câmara."); }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        async function resetCamera() {
+            resultActions.classList.add('hidden');
+            thumbnail.classList.add('hidden');
+            video.classList.remove('hidden');
+            btnMain.classList.remove('hidden');
+            await init();
+        }
+
+        async function takePhoto() {
+            const url = document.getElementById('api-url').value;
+            const sizes = document.getElementById('sizes-input').value;
+            if(!url) return alert("Sincronizando... Aguarde.");
+
+            // 1. Capturar frame para o thumbnail
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const dataUrl = canvas.toDataURL('image/jpeg');
+
+            // 2. Interface UI
+            thumbnail.src = dataUrl;
+            thumbnail.classList.remove('hidden');
+            video.classList.add('hidden');
+            loader.classList.remove('hidden');
+            btnMain.classList.add('hidden');
+
+            // 3. Desligar a câmera para poupar bateria/recursos
+            stopCamera();
+
+            // 4. Enviar para o servidor
+            canvas.toBlob(async (blob) => {
+                const fd = new FormData(); 
+                fd.append('image', blob, 'img.jpg');
+                fd.append('sizes', sizes); // Enviando a string de números
+
+                try {
+                    const response = await fetch(`${url}/process`, { method: 'POST', body: fd });
+                    if(!response.ok) throw new Error();
+                    
+                    const imgBlob = await response.blob();
+                    const resultUrl = URL.createObjectURL(imgBlob);
+
+                    // 5. Substituir thumbnail pela imagem final gerada
+                    thumbnail.src = resultUrl;
+                    document.getElementById('dl-btn').href = resultUrl;
+                    document.getElementById('dl-btn').download = "4winners_studio.png";
+                    
+                    loader.classList.add('hidden');
+                    resultActions.classList.remove('hidden');
+                } catch (e) { 
+                    alert("Erro no processamento. Reiniciando...");
+                    resetCamera();
+                }
+            }, 'image/jpeg', 0.9);
+        }
+
+        window.onload = () => { init(); syncUrl(); };
+    </script>
+</body>
+</html>
