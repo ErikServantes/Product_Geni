@@ -22,11 +22,11 @@
         </header>
 
         <div class="flex-1 w-full min-h-0 relative pb-2">
-            <div class="w-full h-full bg-slate-800 rounded-[2.5rem] p-2 shadow-2xl border border-slate-700 relative overflow-hidden">
+            <div class="w-full h-full bg-slate-800 rounded-[2.5rem] p-2 shadow-2xl border border-slate-700 relative overflow-hidden flex items-center justify-center">
                 
-                <video id="video" autoplay playsinline class="w-full h-full rounded-[2rem] object-cover bg-black"></video>
+                <video id="video" autoplay playsinline class="w-full h-full rounded-[2rem] object-contain bg-black"></video>
                 
-                <img id="thumbnail" class="absolute inset-2 w-[calc(100%-1rem)] h-[calc(100%-1rem)] rounded-[2rem] object-cover bg-black opacity-0 pointer-events-none transition-opacity duration-300 z-10">
+                <img id="thumbnail" class="absolute w-[calc(100%-1rem)] h-[calc(100%-1rem)] rounded-[2rem] object-contain bg-black opacity-0 pointer-events-none transition-opacity duration-300 z-10">
                 
                 <div id="loader" class="absolute inset-2 rounded-[2rem] loader-overlay flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 z-20">
                     <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
@@ -82,9 +82,7 @@
         const REPO_PATH = "erikservantes/Product_Geni";
         let stream = null;
 
-        // Gestor de UI (Muda os botões sem mexer no layout)
         function setUIState(state) {
-            // Reseta tudo para transparente/inativo
             btnMain.classList.replace('opacity-100', 'opacity-0');
             btnMain.classList.replace('pointer-events-auto', 'pointer-events-none');
             
@@ -137,12 +135,10 @@
             if (stream) stream.getTracks().forEach(track => track.stop());
         }
 
-        // Chamado quando a imagem é Guardada/Descarregada
         function showNewPhotoState() {
             setUIState('new_photo');
         }
 
-        // Chamado ao clicar "Descartar" ou "Nova Foto"
         async function resetCamera() {
             thumbnail.classList.replace('opacity-100', 'opacity-0');
             thumbnail.classList.add('pointer-events-none');
@@ -157,7 +153,6 @@
             
             if(!url) return alert("Sincronizando URL... Tente em instantes.");
 
-            // Congela o UI para processing
             setUIState('processing');
 
             const canvas = document.createElement('canvas');
@@ -165,16 +160,14 @@
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
             
-            // Mostra o Thumbnail atual e o loading
             thumbnail.src = canvas.toDataURL('image/jpeg', 0.9);
             thumbnail.classList.replace('opacity-0', 'opacity-100');
             thumbnail.classList.remove('pointer-events-none');
             
             loader.classList.replace('opacity-0', 'opacity-100');
             
-            stopCamera(); // Poupar bateria
+            stopCamera();
 
-            // Envio
             canvas.toBlob(async (blob) => {
                 const fd = new FormData(); 
                 fd.append('image', blob, 'img.jpg');
@@ -187,7 +180,6 @@
                     const imgBlob = await response.blob();
                     const resultUrl = URL.createObjectURL(imgBlob);
 
-                    // Imagem pronta
                     thumbnail.src = resultUrl;
                     document.getElementById('dl-btn').href = resultUrl;
                     document.getElementById('dl-btn').download = `4winners_studio_${Date.now()}.png`;
